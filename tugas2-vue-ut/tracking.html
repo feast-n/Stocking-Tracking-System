@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Delivery Order Imersif</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/tracking.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+</head>
+<body>
+    <div id="app" class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h2>Sistem Pelacakan Rute Distribusi Bahan Ajar</h2>
+            <a href="index.html" class="btn">Kembali ke Beranda</a>
+        </div>
+
+        <div class="tracking-dashboard">
+            <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--dark); border-bottom: 2px dashed #e2e8f0; padding-bottom: 15px;">Registrasi Delivery Order Baru</h3>
+            
+            <form @submit.prevent="submitDO" class="form-grid-2col">
+                <div class="form-group">
+                    <label>Nomor Indentifikasi DO:</label>
+                    <input type="text" :value="generatedDoNumber" disabled style="background: rgba(241, 245, 249, 0.7); font-weight: 800; color: var(--primary); letter-spacing: 1px;">
+                </div>
+                
+                <div class="form-group">
+                    <label>Tanggal Rilis Pengiriman:</label>
+                    <input type="date" v-model="form.tanggalKirim" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Nomor Induk Mahasiswa (NIM):</label>
+                    <input type="text" v-model="form.nim" required maxlength="10" placeholder="Masukkan 10 Digit NIM">
+                </div>
+                
+                <div class="form-group">
+                    <label>Nama Penerima Penuh:</label>
+                    <input type="text" v-model="form.nama" required placeholder="Sesuai Data Kependudukan/KTM">
+                </div>
+
+                <div class="form-group">
+                    <label>Layanan Ekspedisi Distribusi:</label>
+                    <select v-model="form.ekspedisi" required>
+                        <option value="">-- Pilih Moda Ekspedisi --</option>
+                        <option v-for="eks in pengirimanList" :value="eks.nama">{{ eks.nama }}</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Seleksi Bundel Paket Bahan Ajar:</label>
+                    <select v-model="form.paketKode" required>
+                        <option value="">-- Pilih Paket Terdaftar --</option>
+                        <option v-for="pkt in paketList" :value="pkt.kode">{{ pkt.kode }} - {{ pkt.nama }}</option>
+                    </select>
+                </div>
+                
+                <transition name="fade">
+                    <div class="package-detail-card compact-mode col-span-2" v-if="detailPaketTerpilih">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <h4 style="margin: 0 0 10px 0; font-size: 0.95em; color: var(--dark);">Rincian Komponen Paket ({{ detailPaketTerpilih.nama }}):</h4>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <span v-for="isi in detailPaketTerpilih.isi" class="badge" style="background: var(--dark); padding: 6px 12px; font-size: 0.85em; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">{{ isi }}</span>
+                                </div>
+                            </div>
+                            <div style="text-align: right; background: white; padding: 10px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                                <span style="font-size: 0.85em; color: #64748b; font-weight: 800; text-transform: uppercase;">Total Tagihan</span>
+                                <h3 style="margin: 5px 0 0 0; color: var(--danger); font-size: 1.3em;">Rp {{ detailPaketTerpilih.harga.toLocaleString('id-ID') }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </transition>
+
+                <div class="col-span-2" style="text-align: right; margin-top: 15px;">
+                    <button type="submit" class="btn" style="padding: 14px 30px; font-size: 1.05em;">🚀 Otorisasi & Proses Pengiriman</button>
+                </div>
+            </form>
+        </div>
+
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; border-bottom: 3px solid var(--primary); padding-bottom: 5px;">Dasbor Monitoring Pengiriman Berjalan</h3>
+        </div>
+        
+        <transition-group name="list" tag="div" class="tracking-grid">
+            <div v-for="doItem in daftarDO" :key="doItem.noDO" class="tracking-card list-item">
+                <div class="tracking-header">
+                    <h3 style="margin: 0; color: var(--primary); font-size: 1.4em; letter-spacing: 0.5px;">{{ doItem.noDO }}</h3>
+                    <span class="badge" :class="doItem.status === 'Terkirim' ? 'badge-aman' : 'badge-menipis'" style="padding: 8px 15px;">{{ doItem.status }}</span>
+                </div>
+                <div style="margin-bottom: 20px; font-size: 0.95em; line-height: 1.7; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between;"><strong>Penerima:</strong> <span>{{ doItem.nama }} ({{ doItem.nim }})</span></div>
+                    <div style="display: flex; justify-content: space-between;"><strong>Ekspedisi:</strong> <span>{{ doItem.ekspedisi }}</span></div>
+                    <div style="display: flex; justify-content: space-between;"><strong>Kode Paket:</strong> <span>{{ doItem.paketKode }}</span></div>
+                    <div style="display: flex; justify-content: space-between;"><strong>Estimasi Rilis:</strong> <span style="color: var(--primary); font-weight: bold;">{{ doItem.tanggalKirim }}</span></div>
+                </div>
+
+                <div class="timeline-container">
+                    <div class="timeline-item" v-for="(node, index) in doItem.perjalanan" :key="index">
+                        <div class="timeline-icon" :style="{ backgroundColor: index === doItem.perjalanan.length - 1 ? 'var(--success)' : 'var(--primary)' }"></div>
+                        <div class="timeline-content">
+                            <div class="timeline-time" :style="{ color: index === doItem.perjalanan.length - 1 ? 'var(--success)' : 'var(--primary)' }">
+                                {{ node.waktu }}
+                            </div>
+                            <div style="color: #334155; font-size: 0.95em; line-height: 1.5;">{{ node.keterangan }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition-group>
+    </div>
+    <script src="js/tracking-app.js"></script>
+</body>
+</html>
