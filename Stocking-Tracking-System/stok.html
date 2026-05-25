@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Imersif Stok Bahan Ajar</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+</head>
+<body>
+    <div id="app" class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Manajemen Stok Bahan Ajar Eksekutif</h2>
+            <a href="index.html" class="btn">Kembali ke Beranda</a>
+        </div>
+
+        <div class="dashboard-container">
+            <div class="stat-card bg-info">
+                <h3>Total Varian Modul</h3>
+                <div class="value">{{ metrikStok.totalVarian }}</div>
+            </div>
+            <div class="stat-card bg-warning-gradient">
+                <h3>Kritis (Menipis)</h3>
+                <div class="value">{{ metrikStok.menipis }}</div>
+            </div>
+            <div class="stat-card bg-danger-gradient">
+                <h3>Kekosongan Stok</h3>
+                <div class="value">{{ metrikStok.kosong }}</div>
+            </div>
+        </div>
+
+        <div class="filter-dashboard">
+            <div class="filter-header">
+                <h3 style="margin: 0;">Parameter Pencarian & Pemilahan</h3>
+                <button class="btn btn-warning" @click="resetFilter" v-if="isFilterActive">
+                    🔄 Reset Semua Filter
+                </button>
+            </div>
+
+            <div class="search-wrapper">
+                <input type="text" v-model="filter.searchQuery" placeholder="🔍 Cari berdasarkan Kode MK atau Judul Mata Kuliah...">
+            </div>
+
+            <div class="flex-row">
+                <div class="flex-item">
+                    <label><strong>Distrik Operasional (UT-Daerah):</strong></label>
+                    <select v-model="filter.upbjj" style="margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid #ccc;">
+                        <option value="">🌐 Menampilkan Seluruh Distrik</option>
+                        <option v-for="daerah in upbjjList" :value="daerah">{{ daerah }}</option>
+                    </select>
+                </div>
+
+                <transition name="fade">
+                    <div class="flex-item" v-if="filter.upbjj !== ''" style="flex: 2;">
+                        <label><strong>Kategori Klasifikasi Modul:</strong></label>
+                        <div class="pill-group">
+                            <button 
+                                type="button" 
+                                class="pill-btn" 
+                                :class="{ active: filter.kategori === '' }" 
+                                @click="filter.kategori = ''">Semua</button>
+                            <button 
+                                type="button" 
+                                v-for="kat in kategoriList" 
+                                class="pill-btn" 
+                                :class="{ active: filter.kategori === kat }" 
+                                @click="filter.kategori = kat">{{ kat }}</button>
+                        </div>
+                    </div>
+                </transition>
+            </div>
+
+            <div class="flex-row mt-10" style="align-items: center; margin-top: 20px;">
+                <div class="flex-item">
+                    <label><strong>Metode Pengurutan Data:</strong></label>
+                    <select v-model="filter.sortBy" style="margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid #ccc;">
+                        <option value="judul">Urutkan: Alfabetis Judul (A - Z)</option>
+                        <option value="qty">Urutkan: Kuantitas Terendah (Kritis)</option>
+                        <option value="harga">Urutkan: Harga Terendah</option>
+                    </select>
+                </div>
+
+                <div class="flex-item" style="display: flex; justify-content: flex-end; align-items: center;">
+                    <div class="toggle-wrapper" @click="filter.reorderOnly = !filter.reorderOnly">
+                        <span class="toggle-label" :style="{ color: filter.reorderOnly ? 'var(--danger)' : '#666' }">
+                            ⚠️ Isolasi Kebutuhan Re-order
+                        </span>
+                        <div class="toggle-switch" :class="{ active: filter.reorderOnly }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <transition name="fade">
+                <div class="active-filters" v-if="isFilterActive">
+                    <strong>Filter Aktif:</strong>
+                    <span class="filter-tag" v-if="filter.searchQuery">Pencarian: "{{ filter.searchQuery }}"</span>
+                    <span class="filter-tag" v-if="filter.upbjj">Daerah: {{ filter.upbjj }}</span>
+                    <span class="filter-tag" v-if="filter.kategori">Kategori: {{ filter.kategori }}</span>
+                    <span class="filter-tag" v-if="filter.reorderOnly" style="background-color: #f8d7da; color: #721c24;">Status Kritis</span>
+                </div>
+            </transition>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Kode</th>
+                    <th>Mata Kuliah</th>
+                    <th>Daerah</th>
+                    <th>Rak</th>
+                    <th>Stok</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <transition-group name="list" tag="tbody">
+                <tr v-for="item in filteredAndSortedStok" 
+                    :key="item.kode" 
+                    class="list-item"
+                    :class="{'row-warning': item.qty < item.safety && item.qty > 0, 'row-danger': item.qty === 0}">
+                    <td v-text="item.kode"></td>
+                    <td><strong v-text="item.judul"></strong><br><small v-html="item.catatanHTML"></small></td>
+                    <td v-text="item.upbjj"></td>
+                    <td v-text="item.lokasiRak"></td>
+                    <td style="font-size: 1.2em; font-weight: bold;">{{ item.qty }} / {{ item.safety }}</td>
+                    <td>
+                        <span v-if="item.qty === 0" class="badge badge-kosong">⚠️ Kosong</span>
+                        <span v-else-if="item.qty < item.safety" class="badge badge-menipis">⚡ Menipis</span>
+                        <span v-else class="badge badge-aman">✔️ Stabil</span>
+                    </td>
+                    <td><button class="btn btn-success" @click="editStok(item.kode)">Kelola</button></td>
+                </tr>
+            </transition-group>
+        </table>
+
+        <transition name="fade">
+            <div class="modal-overlay" v-if="showModal" @click.self="tutupModal">
+                <div class="modal-content">
+                    <h3>{{ isEdit ? 'Penyesuaian Stok Modul' : 'Pendaftaran Modul Baru' }}</h3>
+                    <form @submit.prevent="simpanData">
+                        <div class="flex-row">
+                            <div class="flex-item form-group"><input type="text" v-model="form.kode" placeholder="Kode MK" required :disabled="isEdit"></div>
+                            <div class="flex-item form-group"><input type="text" v-model="form.judul" placeholder="Judul Mata Kuliah" required></div>
+                        </div>
+                        <div class="flex-row">
+                            <div class="flex-item form-group"><input type="number" v-model.number="form.qty" placeholder="Kuantitas Fisik" required min="0"></div>
+                            <div class="flex-item form-group"><input type="number" v-model.number="form.safety" placeholder="Batas Safety Stok" required min="0"></div>
+                        </div>
+                        <div class="mt-10" style="text-align: right;">
+                            <button type="button" class="btn btn-danger" @click="tutupModal">Batalkan</button>
+                            <button type="submit" class="btn btn-success">Otorisasi & Simpan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </transition>
+
+        <div class="toast-container">
+            <transition-group name="toast">
+                <div v-for="t in toasts" :key="t.id" class="toast" :class="'toast-' + t.type">
+                    <span>{{ t.type === 'success' ? '✅' : '❌' }}</span>
+                    <span>{{ t.message }}</span>
+                </div>
+            </transition-group>
+        </div>
+    </div>
+    <script src="js/stok-app.js"></script>
+</body>
+</html>
